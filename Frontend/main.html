@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Andromeda</title>
+    <link rel="icon" type="image/png" href="assets/Logo.png">
+
+    <!-- Markdown renderer -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="main.css">
+</head>
+
+<body>
+    <!-- Stars background -->
+    <div id="stars-bg"></div>
+
+    <button id="edit-prompt" class="edit-prompt-button" type="button" title="Edit system prompt" aria-label="Edit system prompt">
+        <img src="assets/edit_prompt.png" alt="">
+    </button>
+
+    <div id="prompt-editor" class="prompt-editor" hidden>
+        <div class="prompt-editor-card" role="dialog" aria-modal="true" aria-labelledby="prompt-editor-title">
+            <div class="prompt-editor-header">
+                <h2 id="prompt-editor-title">System prompt</h2>
+                <button id="close-prompt-editor" class="close-prompt-editor" type="button" aria-label="Close editor">×</button>
+            </div>
+            <textarea id="system-prompt" spellcheck="false" aria-label="System prompt"></textarea>
+            <div class="prompt-editor-footer">
+                <span id="prompt-editor-status" role="status"></span>
+                <div>
+                    <button id="cancel-prompt" class="prompt-secondary-button" type="button">Cancel</button>
+                    <button id="save-prompt" class="prompt-save-button" type="button">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="idle-state" aria-hidden="true">
+        <img src="assets/Logo.png" alt="">
+        <img id="sitter" src="assets/sitter.png" alt="">
+        <span class="idle-title">What's our Next expedition?</span>
+        <div class="suggested-prompts" aria-label="Suggested prompts">
+            <button class="suggested-prompt" type="button" data-prompt="What mysteries are hiding in the universe?">What mysteries are hiding in the universe?</button>
+            <button class="suggested-prompt" type="button" data-prompt="How do I get started with Andromeda?">How do I get started with Andromeda?</button>
+            <button class="suggested-prompt" type="button" data-prompt="What are the latest discoveries in AI?">What are the latest discoveries in AI?</button>
+        </div>
+        <div id="time-selector" class="time-selector" aria-label="Time limit" hidden>
+            <button class="time-button" type="button" data-time="ASAP" aria-pressed="false" title="We will use light speed ships but space is BIG"><img src="assets/ASAP.png">ASAP</button>
+            <button class="time-button is-selected" type="button" data-time="3 mins" aria-pressed="true" title="Enough to plan an expedition"><img src="assets/3mins.png">3 mins</button>
+            <button class="time-button" type="button" data-time="5 mins" aria-pressed="false" title="Expeditions can be lengthy"><img src="assets/5mins.png">5 mins</button>
+        </div>
+    </div>
+
+    <div id="chat"></div>
+
+    <div id="input-area">
+        <div id="response-timer" class="response-timer" hidden aria-live="polite">0.0s</div>
+        <div id="model-picker" class="model-picker">
+            <button id="model-picker-button" class="model-picker-button" type="button" aria-haspopup="listbox" aria-expanded="false" title="Select model">
+                <img id="model-provider-logo" src="" alt="">
+                <span id="model-picker-label"></span>
+                <img id="model-picker-chevron" class="model-picker-chevron" src="assets/down_arrow.png" alt="", width="12">
+                <p>  </p>
+            </button>
+            <div id="model-options" class="model-options" role="listbox" aria-label="Choose a model" hidden></div>
+        </div>
+        <div id="input-shell">
+            <input
+                id="input"
+                type="text"
+                placeholder="Ask Andromeda anything..."
+                autocomplete="off"
+            />
+            <button id="send" class="send" aria-label="Send message" title="Send message">
+                    <img src="assets/Send.png" alt="Send">
+            </button>
+        </div>
+        <span id="connection-indicator" class="connection-indicator" aria-label="Disconnected" title="Disconnected"></span>
+    </div>
+    <script>
+        // Seeded 2D value noise -> clustered (constellation-like) placement
+        const rand = (() => { let s = 42; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+        const p = new Uint8Array(512); for (let i = 0; i < 512; i++) p[i] = Math.floor(rand() * 256);
+        function noise(x, y) {
+            const xi = Math.floor(x), yi = Math.floor(y);
+            const u = (x - xi) ** 2 * (3 - 2 * (x - xi)), v = (y - yi) ** 2 * (3 - 2 * (y - yi));
+            const a = p[p[xi & 255] + (yi & 255)], b = p[p[(xi + 1) & 255] + (yi & 255)];
+            const c = p[p[xi & 255] + ((yi + 1) & 255)], d = p[p[(xi + 1) & 255] + ((yi + 1) & 255)];
+            return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
+        }
+        const sb = document.getElementById('stars-bg');
+        let placed = 0;
+        for (let i = 0; i < 5000 && placed < 400; i++) {
+            const x = Math.random(), y = Math.random();
+            const n = noise(x * 10, y * 10) / 255;   // scale to 0..1
+            if (n < 0.1) continue;                // rejection: keep only dense patches -> clusters
+            const s = document.createElement('img');
+            s.src = 'assets/stars.png';
+            s.style.cssText = `--r:${Math.random()*360}deg;--dx:${16+Math.random()*22}px;--dy:${-12+Math.random()*24}px;--dur:${20+Math.random()*16}s;position:fixed;width:${20+n*30}px;opacity:.18;left:${x*100}%;top:${y*100}%;z-index:-1;pointer-events:none;filter:grayscale(1) brightness(1.35);animation:star-drift var(--dur) ease-in-out infinite alternate;`;
+            sb.appendChild(s); placed++;
+        }
+        // Twinkling single stars, scattered randomly
+        for (let i = 0; i < 55; i++) {
+            const s = document.createElement('img');
+            s.src = 'assets/single_star.png';
+            s.style.cssText = `--r:${Math.random()*360}deg;--dx:${16+Math.random()*22}px;--dy:${-12+Math.random()*24}px;--dur:${20+Math.random()*16}s;--delay:${Math.random()*4}s;position:fixed;width:${12+Math.random()*18}px;left:${Math.random()*100}%;top:${Math.random()*100}%;z-index:-1;pointer-events:none;filter:grayscale(1) brightness(1.4);animation:twinkle var(--dur) ease-in-out var(--delay) infinite, star-drift 12s ease-in-out infinite alternate;`;
+            sb.appendChild(s);
+        }
+        // Floater: one image, random corner, slowly drifts in a random direction
+        const f = document.createElement('img');
+        f.src = 'assets/floater.png';
+        const corners = [[6, 6], [94, 6], [6, 94], [94, 94]];
+        const [fx, fy] = corners[Math.floor(Math.random() * 4)];
+        const ang = Math.random() * Math.PI * 2;              // random drift direction
+        const dist = 5 + Math.random() * 10;                  // small drift (stays near its corner)
+        f.style.cssText = `--fdx:${Math.cos(ang)*dist}vw;--fdy:${Math.sin(ang)*dist}vh;position:fixed;left:${fx}%;top:${fy}%;width:${80+Math.random()*60}px;transform:translate(-50%,-50%);opacity:.25;z-index:-1;pointer-events:none;filter:grayscale(1) brightness(1.4);animation:floater 30s linear infinite alternate;`;
+        sb.appendChild(f);
+    </script>
+    <script type="module" src="main.js"></script>
+
+</body>
+</html>
