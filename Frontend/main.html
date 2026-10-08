@@ -6,35 +6,12 @@
     <title>Andromeda</title>
     <link rel="icon" type="image/png" href="assets/Logo.png">
 
-    <!-- Markdown renderer -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="main.css">
 </head>
 
 <body>
     <!-- Stars background -->
     <div id="stars-bg"></div>
-
-    <button id="edit-prompt" class="edit-prompt-button" type="button" title="Edit system prompt" aria-label="Edit system prompt">
-        <img src="assets/edit_prompt.png" alt="">
-    </button>
-
-    <div id="prompt-editor" class="prompt-editor" hidden>
-        <div class="prompt-editor-card" role="dialog" aria-modal="true" aria-labelledby="prompt-editor-title">
-            <div class="prompt-editor-header">
-                <h2 id="prompt-editor-title">System prompt</h2>
-                <button id="close-prompt-editor" class="close-prompt-editor" type="button" aria-label="Close editor">×</button>
-            </div>
-            <textarea id="system-prompt" spellcheck="false" aria-label="System prompt"></textarea>
-            <div class="prompt-editor-footer">
-                <span id="prompt-editor-status" role="status"></span>
-                <div>
-                    <button id="cancel-prompt" class="prompt-secondary-button" type="button">Cancel</button>
-                    <button id="save-prompt" class="prompt-save-button" type="button">Save</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div id="idle-state" aria-hidden="true">
         <img src="assets/Logo.png" alt="">
@@ -45,26 +22,12 @@
             <button class="suggested-prompt" type="button" data-prompt="How do I get started with Andromeda?">How do I get started with Andromeda?</button>
             <button class="suggested-prompt" type="button" data-prompt="What are the latest discoveries in AI?">What are the latest discoveries in AI?</button>
         </div>
-        <div id="time-selector" class="time-selector" aria-label="Time limit" hidden>
-            <button class="time-button" type="button" data-time="ASAP" aria-pressed="false" title="We will use light speed ships but space is BIG"><img src="assets/ASAP.png">ASAP</button>
-            <button class="time-button is-selected" type="button" data-time="3 mins" aria-pressed="true" title="Enough to plan an expedition"><img src="assets/3mins.png">3 mins</button>
-            <button class="time-button" type="button" data-time="5 mins" aria-pressed="false" title="Expeditions can be lengthy"><img src="assets/5mins.png">5 mins</button>
-        </div>
     </div>
 
     <div id="chat"></div>
 
     <div id="input-area">
         <div id="response-timer" class="response-timer" hidden aria-live="polite">0.0s</div>
-        <div id="model-picker" class="model-picker">
-            <button id="model-picker-button" class="model-picker-button" type="button" aria-haspopup="listbox" aria-expanded="false" title="Select model">
-                <img id="model-provider-logo" src="" alt="">
-                <span id="model-picker-label"></span>
-                <img id="model-picker-chevron" class="model-picker-chevron" src="assets/down_arrow.png" alt="", width="12">
-                <p>  </p>
-            </button>
-            <div id="model-options" class="model-options" role="listbox" aria-label="Choose a model" hidden></div>
-        </div>
         <div id="input-shell">
             <input
                 id="input"
