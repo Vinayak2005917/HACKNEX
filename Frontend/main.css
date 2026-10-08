@@ -534,6 +534,7 @@ body:not(.has-messages) #input-area {
 }
 
 #input-shell {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -547,6 +548,27 @@ body:not(.has-messages) #input-area {
     flex: 1 1 auto;
     min-width: 0;
 }
+
+#input-waveform {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+}
+
+#input-waveform[hidden],
+.input-loading[hidden] { display: none; }
+
+.input-loading {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    border: 2px solid rgba(191, 250, 250, .2);
+    border-top-color: #bffafa;
+    border-radius: 50%;
+    animation: input-spin .75s linear infinite;
+}
+
+@keyframes input-spin { to { transform: rotate(360deg); } }
 
 #send img {
     width: 45px;

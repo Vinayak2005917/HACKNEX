@@ -7,8 +7,11 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.142.4",
     "faster-whisper>=1.2.1",
+    "av<19",
+    "huggingface-hub>=1.33.0",
     "ollama>=0.6.3",
     "piper-tts>=1.8.0",
     "python-multipart>=0.0.20",
     "uvicorn>=0.54.0",
+    "cactus-needle>=3.1.2",
 ]

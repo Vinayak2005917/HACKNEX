@@ -10,6 +10,8 @@ const connectionIndicator = document.getElementById("connection-indicator");
 const suggestedPrompts = document.querySelectorAll(".suggested-prompt");
 const suggestedPromptsContainer = document.querySelector(".suggested-prompts");
 const responseTimer = document.getElementById("response-timer");
+const voiceCanvas = document.getElementById("input-waveform");
+const inputLoading = document.getElementById("input-loading");
 
 let isSubmittingMessage = false;
 let responseTimerStartedAt = 0;
@@ -17,6 +19,9 @@ let responseTimerInterval = null;
 let mediaRecorder = null;
 let recordedChunks = [];
 let isRecording = false;
+let audioContext = null;
+let analyser = null;
+let animationFrame = null;
 
 function formatElapsedTime(elapsedSeconds) {
     if (elapsedSeconds < 60) return `${elapsedSeconds.toFixed(1)}s`;
@@ -142,6 +147,43 @@ function preferredAudioType() {
         .find((type) => MediaRecorder.isTypeSupported(type)) || "";
 }
 
+function drawWaveform() {
+    if (!voiceCanvas || !analyser) return;
+    const context = voiceCanvas.getContext("2d");
+    const width = voiceCanvas.clientWidth;
+    const height = voiceCanvas.clientHeight;
+    const pixelRatio = window.devicePixelRatio || 1;
+    if (voiceCanvas.width !== width * pixelRatio || voiceCanvas.height !== height * pixelRatio) {
+        voiceCanvas.width = width * pixelRatio;
+        voiceCanvas.height = height * pixelRatio;
+    }
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    const samples = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(samples);
+    context.clearRect(0, 0, width, height);
+    context.lineWidth = 2;
+    context.strokeStyle = "#bffafa";
+    context.shadowColor = "rgba(120, 240, 255, .7)";
+    context.shadowBlur = 8;
+    context.beginPath();
+    for (let i = 0; i < samples.length; i++) {
+        const x = (i / (samples.length - 1)) * width;
+        const y = (samples[i] / 255) * height;
+        if (i === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+    }
+    context.stroke();
+    animationFrame = requestAnimationFrame(drawWaveform);
+}
+
+function stopWaveform() {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    animationFrame = null;
+    if (audioContext && audioContext.state !== "closed") audioContext.close();
+    audioContext = null;
+    analyser = null;
+}
+
 async function startRecording() {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
         addMessage("Audio recording is not supported in this browser.", "agent");
@@ -149,6 +191,10 @@ async function startRecording() {
     }
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new AudioContext();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        audioContext.createMediaStreamSource(stream).connect(analyser);
         recordedChunks = [];
         const mimeType = preferredAudioType();
         mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -158,30 +204,49 @@ async function startRecording() {
         mediaRecorder.addEventListener("stop", () => {
             stream.getTracks().forEach((track) => track.stop());
             const audioBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" });
-            if (audioBlob.size) transcribeRecording(audioBlob);
+            stopWaveform();
+            if (audioBlob.size) {
+                transcribeRecording(audioBlob);
+            }
         }, { once: true });
         mediaRecorder.start();
         isRecording = true;
-        addMessage("Recording audio… Press Ctrl+D again to transcribe.", "agent");
+        input.disabled = true;
+        input.placeholder = "Listening…";
+        voiceCanvas.hidden = false;
+        inputLoading.hidden = true;
+        drawWaveform();
         connectionIndicator.classList.add("recording");
         connectionIndicator.title = "Recording audio — press Ctrl+D to stop";
         connectionIndicator.setAttribute("aria-label", "Recording audio");
     } catch (error) {
+        stopWaveform();
+        voiceCanvas.hidden = true;
+        input.disabled = false;
+        input.placeholder = "Ask Andromeda anything...";
         addMessage(`Unable to start recording: ${error.message}`, "agent");
     }
 }
 
 function stopRecording() {
-    if (mediaRecorder?.state === "recording") mediaRecorder.stop();
+    const wasRecording = mediaRecorder?.state === "recording";
+    if (wasRecording) mediaRecorder.stop();
     isRecording = false;
     connectionIndicator.classList.remove("recording");
     setConnectionState(true);
+    if (wasRecording) {
+        voiceCanvas.hidden = true;
+        inputLoading.hidden = false;
+        input.disabled = false;
+        input.placeholder = "Transcribing audio…";
+    }
 }
 
 async function transcribeRecording(blob) {
     setBusy(true);
     startResponseTimer();
-    addMessage("Transcribing recording…", "agent");
+    voiceCanvas.hidden = true;
+    inputLoading.hidden = false;
     try {
         const extension = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "mp4" : "webm";
         const formData = new FormData();
@@ -192,12 +257,19 @@ async function transcribeRecording(blob) {
         const transcription = typeof result === "string" ? result : result.text || result.transcription || "";
         if (!transcription.trim()) throw new Error("No speech was detected.");
         input.value = transcription;
+        input.placeholder = "Ask Andromeda anything...";
         updatePromptState();
         setBusy(false);
-        await sendMessage(transcription);
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
     } catch (error) {
+        input.placeholder = "Ask Andromeda anything...";
         addMessage(`Unable to transcribe audio: ${error.message}`, "agent");
     } finally {
+        inputLoading.hidden = true;
+        voiceCanvas.hidden = true;
+        input.disabled = false;
+        if (input.placeholder === "Transcribing audio…") input.placeholder = "Ask Andromeda anything...";
         stopResponseTimer();
         setBusy(false);
     }
@@ -207,7 +279,10 @@ document.addEventListener("keydown", (event) => {
     if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "d") {
         event.preventDefault();
         if (isRecording) stopRecording();
-        else if (!isSubmittingMessage) startRecording();
+        else if (!isSubmittingMessage) {
+            voicePanel.hidden = false;
+            startRecording();
+        }
     }
     if (event.key === "Escape" && isRecording) stopRecording();
 });
